@@ -1,0 +1,6 @@
+n2p-script-executor
+*.bak
+*.txt
+bin/
+build/
+

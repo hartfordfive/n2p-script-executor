@@ -1,0 +1,10 @@
+#!/bin/bash
+
+response=$(curl --write-out %{http_code} --max-time 5 --silent --output /dev/null https://prometheus.io)
+echo $response
+
+if [ "$response" == "200" ]; then
+  exit 0
+else
+  exit 1
+fi
