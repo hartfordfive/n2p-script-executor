@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/hartfordfive/n2p-script-executor/executor"
 	"github.com/hartfordfive/n2p-script-executor/lib"
 	"github.com/hartfordfive/n2p-script-executor/logging"
+	"github.com/hartfordfive/n2p-script-executor/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -78,9 +78,9 @@ var RunCmd = &cobra.Command{
 				series = append(series, lib.TextfileCollectorMetric{
 					OriginScript: lib.GetScriptName(elem.ScriptPath),
 					Labels:       nil,
-					Value:        float64(elem.ExitCode),
+					Value:        elem.Metric,
 				})
-				log.Debugf("Script: %v, Exit code: %d, Error: %v", elem.ScriptPath, elem.ExitCode, elem.ExitCode)
+				log.Debugf("Script: %v, Exit code: %d, Error: %v", elem.ScriptPath, elem.Metric, elem.Error)
 				work.Wg.Done()
 			}
 			log.Info("Done processing results")
@@ -92,13 +92,17 @@ var RunCmd = &cobra.Command{
 			if len(series) >= 1 {
 				// Write the series to the output file
 				lib.WriteSeriesToFile(series, FlagOutputFile)
-				lib.WriteCheckpointMetric(FlagOutputFile)
 				// Write a custom metric that indicates the unix millisecond timestamp at which the last time the latest metrics were written
-
+				lib.WriteCheckpointMetric(FlagOutputFile)
 				os.Exit(0)
 
 			}
+			os.Exit(1)
 		}
+
+		lib.WriteSeriesToStdOut(series)
+		os.Exit(0)
+
 	},
 }
 
@@ -108,7 +112,7 @@ var VersionCmd = &cobra.Command{
 	Short: "Show version",
 	Long:  `Show the version and exit.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Version: X.Y.Z")
+		version.PrintVersion()
 		os.Exit(0)
 	},
 }

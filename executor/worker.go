@@ -50,24 +50,22 @@ func (w *WorkQueue) execWorker(id int) {
 		select {
 		case script := <-w.pendingWorkChan:
 			log.Debugf("[Worker #%d] Running script %s", id, script)
-			exitCode, err := RunScript(script, 20)
+			metric, err := RunScript(script, "exitcode", 15)
 			if err != nil {
-				log.Errorf("[Worker #%d] Encountered error executing script %s (Exit Code: %v, Error: %v)", id, script, exitCode, err)
+				log.Errorf("[Worker #%d] Encountered error executing script %s (Exit Code: %v, Error: %v)", id, script, metric, err)
 			} else {
-				log.Debugf("[Worker #%d] Script %s completed execution (Exit Code: %v)", id, script, exitCode)
+				log.Debugf("[Worker #%d] Script %s completed execution (Exit Code: %v)", id, script, metric)
 			}
 			w.ResultsChan <- ExecutionResult{
 				ScriptPath: script,
-				ExitCode:   exitCode,
+				Metric:     metric,
 				Error:      err,
 			}
 		case <-w.doneChan:
 			log.Debugf("[Worker #%d] Shutting down", id)
-			close(w.pendingWorkChan)
-			close(w.ResultsChan)
 			return
 		case <-ticker.C:
-			log.Tracef("Worker #%d] Waiting for work", id)
+			log.Tracef("[Worker #%d] Waiting for work", id)
 		}
 	}
 }

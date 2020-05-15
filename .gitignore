@@ -1,6 +1,6 @@
 n2p-script-executor
 *.bak
-*.txt
+*.prom
 bin/
 build/
 

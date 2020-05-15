@@ -38,6 +38,15 @@ func WriteSeriesToFile(metrics []TextfileCollectorMetric, file string) {
 	WriteToFile(file, data)
 }
 
+// WriteSeriesToStdOut writes the series to standard out
+func WriteSeriesToStdOut(metrics []TextfileCollectorMetric) {
+	for _, metric := range metrics {
+		log.Print(metric.String())
+	}
+	log.Print(filepath.Join(fmt.Sprintf("node_n2p_script_executor_lastrun %d", (time.Now().UnixNano() / int64(time.Millisecond)))))
+}
+
+// WriteCheckpointMetric writes a metric to a file indicating the unix ms timestamp of when the last time the metrics were written.
 func WriteCheckpointMetric(file string) {
-	WriteToFile(filepath.Join(filepath.Dir(file), "node_n2p_script_executor.txt"), fmt.Sprintf("node_n2p_script_executor_lastrun %d", (time.Now().UnixNano()/int64(time.Millisecond))))
+	WriteToFile(filepath.Join(filepath.Dir(file), "node_n2p_script_executor.prom"), fmt.Sprintf("node_n2p_script_executor_lastrun %d", (time.Now().UnixNano()/int64(time.Millisecond))))
 }

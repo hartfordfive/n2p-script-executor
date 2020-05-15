@@ -22,7 +22,7 @@ var (
 // ExecutionResult is a struct generated with the execution result of the script
 type ExecutionResult struct {
 	ScriptPath string
-	ExitCode   int
+	Metric     float64
 	Error      error
 }
 
@@ -47,7 +47,7 @@ func GetScripts(scriptsDir string) ([]string, error) {
 }
 
 // RunScript starts the execution of the script
-func RunScript(scriptPath string, timeout int) (int, error) {
+func RunScript(scriptPath string, metricType string, timeout int) (float64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
@@ -60,25 +60,37 @@ func RunScript(scriptPath string, timeout int) (int, error) {
 		return -1, errors.New("Script execution deadline exceeded")
 	}
 
+	if metricType == "stdout" {
+		output, err := cmd.Output()
+		if err != nil {
+			return float64(-1), err
+		}
+		f, err := strconv.ParseFloat(string(output), 64)
+		if err != nil {
+			return float64(-1), err
+		}
+		return f, nil
+	}
+
 	if err != nil {
 		if err != nil {
 			re := regexp.MustCompile("exit status ([0-9])+")
 			match := re.FindStringSubmatch(err.Error())
 			if len(match) >= 1 {
 				i, _ := strconv.Atoi(match[1])
-				return i, nil
+				return float64(i), nil
 			}
 			log.Error(err.Error())
-			return -1, err
+			return float64(-1), err
 		}
 		if exitError, ok := err.(*exec.ExitError); ok {
 			waitStatus = exitError.Sys().(syscall.WaitStatus)
-			return waitStatus.ExitStatus(), nil
+			return float64(waitStatus.ExitStatus()), nil
 		}
 	}
 
 	// Success
 	waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
-	return waitStatus.ExitStatus(), nil
+	return float64(waitStatus.ExitStatus()), nil
 
 }

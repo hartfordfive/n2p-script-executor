@@ -2,7 +2,7 @@
 
 ## Description
 
-The goal of this tool is to provide a certain level of compatiblity when migrating your monitoring system from Nagios to Prometheus. 
+The goal of this tool is to provide a certain level of compatiblity when migrating your monitoring system from Nagios to Prometheus. This works by executing all scripts within the specified directory, and then capturing either the exit code or the standard out (if only a number) to then present it with a metric name in a Prometheus format.  An additional metric **node_n2p_script_executor_lastrun** is also written to a file called `node_n2p_script_executor.prom`.  This is used to determine the time of the last execution of the executor.  The goal is to help identify if generated metrics in the files are stale or not.
 
 
 ## Command Usage
@@ -37,4 +37,4 @@ TODO
 
 ## Author
 
-Alain Lefebvre <hartfordfive@gmail.com>
+Alain Lefebvre <hartfordfive'at'gmail.com>
