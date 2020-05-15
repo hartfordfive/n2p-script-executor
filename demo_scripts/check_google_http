@@ -1,0 +1,4 @@
+#!/bin/bash
+
+nc -vvv -w 1 google.com 80
+exit $?

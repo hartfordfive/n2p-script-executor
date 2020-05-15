@@ -1,0 +1,4 @@
+#!/bin/bash
+
+ps aux | grep /usr/sbin/syslogd1 | grep -v grep
+exit $?

@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+
+import sys
+
+print("This is a test")
+
+sys.exit(0)
