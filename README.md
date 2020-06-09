@@ -31,6 +31,18 @@ Flags:
 **n2p-script-executor version** (only returns version info and author)
 
 
+## Sample Script Output
+
+```
+node_nagios_script_check_dummy 2.000000
+node_nagios_script_check_python_test 0.000000
+node_nagios_script_check_google_http 0.000000
+node_nagios_script_check_syslogd_running 1.000000
+node_nagios_script_check_prom_website_up 0.000000
+node_nagios_script_check_google_ping 0.000000
+node_n2p_script_executor_lastrun 1589537621319
+```
+
 ## Building From Source
 
 TODO

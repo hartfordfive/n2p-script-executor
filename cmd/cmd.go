@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/hartfordfive/n2p-script-executor/executor"
@@ -17,8 +18,8 @@ func Execute() error {
 }
 
 var (
-	FlagScriptsDir string
 	FlagOutputFile string
+	FlagConfig     string
 	FlagLogLevel   string
 	FlagSimulate   bool
 )
@@ -35,8 +36,8 @@ picked up by the textfile collector module of the node_exporter.`,
 )
 
 func init() {
-	RunCmd.Flags().StringVarP(&FlagScriptsDir, "scripts-path", "p", "", "Path where the active scripts are located")
 	RunCmd.Flags().StringVarP(&FlagOutputFile, "output-file", "o", "", "Path to the file which the data will be written to, which will in turn be read by the textfile collector module.")
+	RunCmd.Flags().StringVarP(&FlagConfig, "config", "c", "", "Path to the config")
 	RunCmd.Flags().StringVarP(&FlagLogLevel, "log-level", "l", "", "Enable debug logging.")
 	RunCmd.Flags().BoolVarP(&FlagSimulate, "simulate", "s", false, "Simulate only, don't write metrics to output textfile.")
 	entry.AddCommand(RunCmd, VersionCmd)
@@ -47,60 +48,9 @@ var RunCmd = &cobra.Command{
 	Use:   "run ",
 	Short: "Run the script execution",
 	Long:  `Runs the script execution, which will run all scripts in the specified directory.`,
-	//Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		logging.SetLogLevel(FlagLogLevel)
-		log.Debug("Running the script executor.")
-		scripts, err := executor.GetScripts(FlagScriptsDir)
-		if err != nil {
-			log.Error(err)
-		}
-
-		numWorkers := 4
-		if len(scripts) < 4 {
-			numWorkers = len(scripts)
-		}
-
-		work := executor.NewWorkQueue(4, numWorkers, len(scripts))
-		log.Info("Starting script execution workers...")
-		work.Process()
-
-		log.Info("Submitting scripts to be executed")
-		for _, s := range scripts {
-			work.SubmitTask(s)
-		}
-
-		var series []lib.TextfileCollectorMetric
-		go func() {
-			log.Info("Waiting for results...")
-
-			for elem := range work.ResultsChan {
-				series = append(series, lib.TextfileCollectorMetric{
-					OriginScript: lib.GetScriptName(elem.ScriptPath),
-					Labels:       nil,
-					Value:        elem.Metric,
-				})
-				log.Debugf("Script: %v, Exit code: %d, Error: %v", elem.ScriptPath, elem.Metric, elem.Error)
-				work.Wg.Done()
-			}
-			log.Info("Done processing results")
-
-		}()
-
-		work.Wg.Wait()
-		if !FlagSimulate {
-			if len(series) >= 1 {
-				// Write the series to the output file
-				lib.WriteSeriesToFile(series, FlagOutputFile)
-				// Write a custom metric that indicates the unix millisecond timestamp at which the last time the latest metrics were written
-				lib.WriteCheckpointMetric(FlagOutputFile)
-				os.Exit(0)
-
-			}
-			os.Exit(1)
-		}
-
-		lib.WriteSeriesToStdOut(series)
+		run()
 		os.Exit(0)
 
 	},
@@ -115,4 +65,76 @@ var VersionCmd = &cobra.Command{
 		version.PrintVersion()
 		os.Exit(0)
 	},
+}
+
+func run() {
+
+	cnf, err := executor.LoadConfig(FlagConfig)
+	if err != nil {
+		log.Errorln(err)
+		os.Exit(1)
+	}
+
+	numWorkers := 4
+	if len(cnf.Scripts) < 4 {
+		numWorkers = len(cnf.Scripts)
+	}
+
+	work := executor.NewWorkQueue(4, numWorkers, len(cnf.Scripts))
+	log.Info("Starting script execution workers...")
+	work.Process()
+
+	log.Info("Submitting scripts to be executed")
+	validOutputTypes := []string{"exit_code", "stdout", "multi_metric"}
+	for _, s := range cnf.Scripts {
+		if !lib.StringIsInSlice(s.OutputType, validOutputTypes) {
+			log.Error("Invalid script output type: ", s.OutputType)
+			continue
+		}
+		work.SubmitTask(s)
+	}
+
+	var series []lib.TextfileCollectorMetric
+	var execSuccess = make([]string, 0, len(cnf.Scripts))
+
+	go func(execSuccess *[]string) {
+		log.Info("Waiting for results...")
+		for res := range work.ResultsChan {
+
+			for _, metric := range res.Metrics {
+				series = append(series, lib.TextfileCollectorMetric{
+					Name:   metric.Name,
+					Labels: metric.Labels,
+					Value:  metric.Value,
+				})
+			}
+			*execSuccess = append(*execSuccess, res.ScriptPath)
+			log.Debug("Decrementing waitgroup")
+			work.Wg.Done()
+		}
+		log.Info("Done processing results")
+
+	}(&execSuccess)
+
+	log.Info("Waiting for all script executions to be completed...")
+	work.Wg.Wait()
+
+	seriesOutput := lib.GenerateSeries(series, execSuccess)
+
+	if !FlagSimulate {
+		if len(series) >= 1 {
+			// Write the series to the output file
+			lib.WriteToFile(FlagOutputFile, seriesOutput)
+			os.Exit(0)
+
+		}
+		os.Exit(1)
+	}
+
+	fmt.Fprintf(os.Stdout, seriesOutput)
+	if len(series) >= 1 {
+		os.Exit(0)
+	}
+
+	os.Exit(1)
 }

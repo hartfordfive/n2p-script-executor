@@ -1,3 +1,6 @@
+# github.com/go-yaml/yaml v2.1.0+incompatible
+## explicit
+github.com/go-yaml/yaml
 # github.com/google/renameio v0.1.0
 ## explicit
 github.com/google/renameio
@@ -15,3 +18,5 @@ github.com/spf13/cobra
 github.com/spf13/pflag
 # golang.org/x/sys v0.0.0-20190422165155-953cdadca894
 golang.org/x/sys/unix
+# gopkg.in/yaml.v2 v2.3.0
+## explicit

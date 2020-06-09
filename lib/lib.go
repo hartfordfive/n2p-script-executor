@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -36,4 +37,33 @@ func WriteToFile(file string, data string) bool {
 		return false
 	}
 	return true
+}
+
+// ReturnRegexCaptures accepts a regex pattern and returns a map with the matches
+func ReturnRegexCaptures(re, str string) (map[string]string, error) {
+	r := regexp.MustCompile(re)
+	matches := r.FindStringSubmatch(str)
+	groups := r.SubexpNames()
+	if len(r.FindStringSubmatch(str)) == 0 {
+		return nil, errors.New("No matches")
+	}
+	res := map[string]string{}
+	for i, m := range matches {
+		if i == 0 {
+			continue
+		}
+		res[groups[i]] = m
+	}
+	return res, nil
+}
+
+// StringIsInSlice returns true if the string is found in the slice.
+// Acceptable for search small slices only as it's time comoplexity is O(n)
+func StringIsInSlice(item string, list []string) bool {
+	for _, elem := range list {
+		if item == elem {
+			return true
+		}
+	}
+	return false
 }

@@ -2,7 +2,8 @@ package lib
 
 import (
 	"fmt"
-	"path/filepath"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,39 +15,68 @@ const tagName = "textfile_collector"
 // TextfileCollectorMetric is a struct which will be serialized to be written to a file
 // to be picked up by the node_exporter
 type TextfileCollectorMetric struct {
-	OriginScript string
-	Labels       []string
-	Value        float64
+	Name   string
+	Labels map[string]string
+	Value  float64
 }
 
 func (tc TextfileCollectorMetric) String() string {
 	if len(tc.Labels) >= 1 {
-		return fmt.Sprintf("node_nagios_script_%s{%s} %f", GetScriptName(tc.OriginScript), strings.Join(tc.Labels, ","), tc.Value)
+		flattendLabels := []string{}
+		for k, v := range tc.Labels {
+			flattendLabels = append(flattendLabels, fmt.Sprintf("%s=\"%s\"", k, v))
+		}
+
+		if ValueCanBeInt(tc.Value) {
+			return fmt.Sprintf("n2p_script_exec_%s{%s} %s", tc.Name, strings.Join(flattendLabels, ", "), convertToIntString(tc.Value))
+		}
+		return fmt.Sprintf("n2p_script_exec_%s{%s} %f", tc.Name, strings.Join(flattendLabels, ", "), tc.Value)
 	}
-	return fmt.Sprintf("node_nagios_script_%s %f", GetScriptName(tc.OriginScript), tc.Value)
+
+	if ValueCanBeInt(tc.Value) {
+		return fmt.Sprintf("n2p_script_exec_%s %s", tc.Name, convertToIntString(tc.Value))
+	}
+	return fmt.Sprintf("n2p_script_exec_%s %f", tc.Name, tc.Value)
 }
 
-// WriteSeriesToFile takes the array of TextfileCollectorMetric and writes them to the destination file
-func WriteSeriesToFile(metrics []TextfileCollectorMetric, file string) {
-	log.Debugf("Writing series to file: %s", file)
+// ValueCanBeInt is used to determine if the float value can really be represented as an int
+func ValueCanBeInt(val float64) bool {
+	if val-math.Trunc(val) == 0 {
+		return true
+	}
+	return false
+}
+
+func convertToIntString(val float64) string {
+	return strconv.FormatInt(int64(val), 10)
+}
+
+// GenerateSeries takes the array of TextfileCollectorMetric and writes them to the destination file
+func GenerateSeries(metrics []TextfileCollectorMetric, execSuccess []string) string {
 	data := ""
 	for _, metric := range metrics {
-		log.Debug("Adding metric: %s", metric.String())
-		data += metric.String()
-		data += "\n"
+		log.Debugf("Adding metric: %s", metric.String())
+		data += metric.String() + "\n"
 	}
-	WriteToFile(file, data)
+	for _, script := range execSuccess {
+		data += generateScriptCheckpointMetric(script) + "\n"
+	}
+	data += GenerateExecutorCheckpointMetric() + "\n"
+
+	return data
 }
 
-// WriteSeriesToStdOut writes the series to standard out
-func WriteSeriesToStdOut(metrics []TextfileCollectorMetric) {
-	for _, metric := range metrics {
-		log.Print(metric.String())
-	}
-	log.Print(filepath.Join(fmt.Sprintf("node_n2p_script_executor_lastrun %d", (time.Now().UnixNano() / int64(time.Millisecond)))))
+func generateScriptCheckpointMetric(scriptName string) string {
+	return fmt.Sprintf(
+		"n2p_script_exec_lastrun{script=\"%s\"} %d",
+		scriptName,
+		(time.Now().UnixNano() / int64(time.Millisecond)),
+	)
 }
 
-// WriteCheckpointMetric writes a metric to a file indicating the unix ms timestamp of when the last time the metrics were written.
-func WriteCheckpointMetric(file string) {
-	WriteToFile(filepath.Join(filepath.Dir(file), "node_n2p_script_executor.prom"), fmt.Sprintf("node_n2p_script_executor_lastrun %d", (time.Now().UnixNano()/int64(time.Millisecond))))
+func GenerateExecutorCheckpointMetric() string {
+	return fmt.Sprintf(
+		"n2p_script_exec_lastrun %d",
+		(time.Now().UnixNano() / int64(time.Millisecond)),
+	)
 }
