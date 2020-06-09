@@ -9,30 +9,30 @@ import (
 
 // WorkQueue is the struct for the work queue
 type WorkQueue struct {
-	numWorkers      int
-	pendingWorkChan chan string
-	ResultsChan     chan ExecutionResult
-	doneChan        chan interface{}
-	Wg              *sync.WaitGroup
+	numWorkers            int
+	pendingScriptWorkChan chan Script
+	ResultsChan           chan ExecutionResult
+	doneChan              chan interface{}
+	Wg                    *sync.WaitGroup
 }
 
 // NewWorkQueue returns a new instance of WorkQueue
 func NewWorkQueue(capacity int, maxWorkers int, totalScripts int) *WorkQueue {
 	wq := &WorkQueue{
-		numWorkers:      maxWorkers,
-		pendingWorkChan: make(chan string, capacity),
-		ResultsChan:     make(chan ExecutionResult, capacity),
-		doneChan:        make(chan interface{}, 1),
-		Wg:              &sync.WaitGroup{},
+		numWorkers:            maxWorkers,
+		pendingScriptWorkChan: make(chan Script, capacity),
+		ResultsChan:           make(chan ExecutionResult, capacity),
+		doneChan:              make(chan interface{}, 1),
+		Wg:                    &sync.WaitGroup{},
 	}
 	return wq
 }
 
 // SubmitTask adds a new script execution task to the channel
-func (w *WorkQueue) SubmitTask(scriptPath string) {
-	log.Debug("Submiting script ", scriptPath, " to be executed...")
+func (w *WorkQueue) SubmitTask(script Script) {
+	log.Debug("Submiting script ", script.Path, " to be executed...")
 	w.Wg.Add(1)
-	w.pendingWorkChan <- scriptPath
+	w.pendingScriptWorkChan <- script
 	log.Debug("Script submitted")
 }
 
@@ -48,19 +48,16 @@ func (w *WorkQueue) execWorker(id int) {
 	ticker := time.NewTicker(2 * time.Second)
 	for {
 		select {
-		case script := <-w.pendingWorkChan:
-			log.Debugf("[Worker #%d] Running script %s", id, script)
-			metric, err := RunScript(script, "exitcode", 15)
-			if err != nil {
-				log.Errorf("[Worker #%d] Encountered error executing script %s (Exit Code: %v, Error: %v)", id, script, metric, err)
+		case script := <-w.pendingScriptWorkChan:
+			log.Debugf("[Worker #%d] Running script %s", id, script.Path)
+			scriptResult := RunScript(script, 5)
+
+			if scriptResult.Error != nil {
+				log.Errorf("[Worker #%d] Encountered error executing script %s (Error: %v)", id, script.Name, scriptResult.Error)
 			} else {
-				log.Debugf("[Worker #%d] Script %s completed execution (Exit Code: %v)", id, script, metric)
+				log.Debugf("[Worker #%d] Script %s completed execution. Result: %v", id, script.Name, scriptResult)
 			}
-			w.ResultsChan <- ExecutionResult{
-				ScriptPath: script,
-				Metric:     metric,
-				Error:      err,
-			}
+			w.ResultsChan <- scriptResult
 		case <-w.doneChan:
 			log.Debugf("[Worker #%d] Shutting down", id)
 			return
