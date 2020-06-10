@@ -1,9 +1,13 @@
 ---
 scripts:
   - name: check_dummy
+    type: gauge
+    help: Just a dummy check metrics
     path: "demo_scripts/check_dummy"
     output_type: exit_code
   - name: check_google_http
+    type: gauge
+    help: Check to verify if google.com is up
     path: "demo_scripts/check_google_http"
     output_type: exit_code
     override_metric_name: http_site
@@ -12,14 +16,21 @@ scripts:
       protocol: https
       url: www.google.com
   - name: check_google_ping
+    type: gauge
+    help: Get the averge ping latency to google.com
     path: "demo_scripts/check_google_ping"
     output_type: stdout
     labels:
       site_category: search_engine
       url: www.google.com
   - name: check_system_load
+    type: gauge
+    help: The current system load
     path: "demo_scripts/check_system_load"
     output_type: "multi_metric"
     metrics_regex: ".*load\\s+averages:\\s+(?P<load1min>\\d*\\.?\\d*)\\s+(?P<load5min>\\d*\\.?\\d*)\\s+(?P<load15min>\\d*\\.?\\d*).*"
     labels:
       server_type: web
+  - name: check_raw_metrics
+    path: "demo_scripts/check_raw_metrics"
+    output_type: "raw_series"
