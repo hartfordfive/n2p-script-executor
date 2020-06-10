@@ -1,6 +1,0 @@
-#!/bin/bash
-
-echo 'my_custom_app_total_requests{instance="web01", shard="users01"} 46223'
-echo 'my_custom_app_total_requests{instance="app01", shard="transactions01"} 2466'
-echo 'my_custom_app_total_requests{instance="web03", shard="users02"} 48665'
-exit 0

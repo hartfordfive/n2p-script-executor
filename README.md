@@ -24,9 +24,12 @@ Flags:
   -h, --help                  help for run
   -l, --log-level string      Enable debug logging.
   -o, --output-file string    Path to the file which the data will be written to, which will in turn be read by the textfile collector module.
-  -p, --scripts-path string   Path where the active scripts are located
-  -s, --simulate              Simulate only, don't write metrics to output textfile.
+  -c, --config string         The Path to the config file
+  -s, --simulate              Simulate and ouput series to stdout only.
 ```
+
+*See [sample-config.yml](conf/sample-config.yml) for config example.*
+
 
 **n2p-script-executor version** (only returns version info and author)
 

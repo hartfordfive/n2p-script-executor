@@ -85,7 +85,7 @@ func run() {
 	work.Process()
 
 	log.Info("Submitting scripts to be executed")
-	validOutputTypes := []string{"exit_code", "stdout", "multi_metric"}
+	validOutputTypes := []string{"exit_code", "stdout", "multi_metric", "raw_series"}
 	for _, s := range cnf.Scripts {
 		if !lib.StringIsInSlice(s.OutputType, validOutputTypes) {
 			log.Error("Invalid script output type: ", s.OutputType)
@@ -94,19 +94,14 @@ func run() {
 		work.SubmitTask(s)
 	}
 
-	var series []lib.TextfileCollectorMetric
+	var series []lib.Metric
 	var execSuccess = make([]string, 0, len(cnf.Scripts))
 
 	go func(execSuccess *[]string) {
 		log.Info("Waiting for results...")
 		for res := range work.ResultsChan {
-
 			for _, metric := range res.Metrics {
-				series = append(series, lib.TextfileCollectorMetric{
-					Name:   metric.Name,
-					Labels: metric.Labels,
-					Value:  metric.Value,
-				})
+				series = append(series, metric)
 			}
 			*execSuccess = append(*execSuccess, res.ScriptPath)
 			log.Debug("Decrementing waitgroup")
@@ -121,6 +116,7 @@ func run() {
 
 	seriesOutput := lib.GenerateSeries(series, execSuccess)
 
+	log.Infof("Writing resulting series to %s", FlagOutputFile)
 	if !FlagSimulate {
 		if len(series) >= 1 {
 			// Write the series to the output file
