@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/go-yaml/yaml"
 	"github.com/hartfordfive/n2p-script-executor/lib"
+	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/pkg/textparse"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -29,20 +32,15 @@ var (
 type ExecutionResult struct {
 	ScriptPath string
 	ScriptName string
-	Metrics    []Metric
+	Metrics    []lib.Metric
 	Error      error
-}
-
-// Metric is the end result of an execution which contains a metric name, labels and its value
-type Metric struct {
-	Name   string
-	Labels map[string]string
-	Value  float64
 }
 
 // Script is the struct describing the script to be executed
 type Script struct {
 	Name               string            `yaml:"name"`
+	Type               string            `yaml:"type"`
+	Help               string            `yaml:"help"`
 	OutputType         string            `yaml:"output_type"`
 	Path               string            `yaml:"path"`
 	OverrideMetricName string            `yaml:"override_metric_name"`
@@ -100,19 +98,7 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	}
 	script.Labels["script"] = script.Path
 
-	if script.OutputType == "checkpoint" {
-		return ExecutionResult{
-			ScriptPath: script.Path,
-			ScriptName: script.Name,
-			Metrics: []Metric{
-				Metric{
-					Name:   lib.GetScriptName(script.Path),
-					Labels: script.Labels,
-					Value:  float64(time.Now().UnixNano() / int64(time.Millisecond)),
-				},
-			},
-		}
-	} else if script.OutputType == "exit_code" {
+	if script.OutputType == "exit_code" {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
 
@@ -123,7 +109,8 @@ func RunScript(script Script, timeout int) ExecutionResult {
 
 		if ctx.Err() == context.DeadlineExceeded {
 			return ExecutionResult{
-				Error: errors.New("Script execution deadline exceeded"),
+				ScriptPath: script.Path,
+				Error:      errors.New("Script execution deadline exceeded"),
 			}
 		}
 		if execErr != nil {
@@ -134,11 +121,13 @@ func RunScript(script Script, timeout int) ExecutionResult {
 				return ExecutionResult{
 					ScriptPath: script.Path,
 					ScriptName: script.Name,
-					Metrics: []Metric{
-						Metric{
+					Metrics: []lib.Metric{
+						lib.Metric{
 							Name:   lib.GetScriptName(script.Path),
 							Labels: script.Labels,
 							Value:  float64(i),
+							Type:   script.Type,
+							Help:   script.Help,
 						},
 					},
 				}
@@ -146,7 +135,8 @@ func RunScript(script Script, timeout int) ExecutionResult {
 			}
 			log.Error(execErr.Error())
 			return ExecutionResult{
-				Error: errors.New("Could not get exit code"),
+				ScriptPath: script.Path,
+				Error:      errors.New("Could not get exit code"),
 			}
 		}
 		if exitError, ok := execErr.(*exec.ExitError); ok {
@@ -154,11 +144,13 @@ func RunScript(script Script, timeout int) ExecutionResult {
 			return ExecutionResult{
 				ScriptPath: script.Path,
 				ScriptName: script.Name,
-				Metrics: []Metric{
-					Metric{
+				Metrics: []lib.Metric{
+					lib.Metric{
 						Name:   lib.GetScriptName(script.Path),
 						Labels: script.Labels,
 						Value:  float64(waitStatus.ExitStatus()),
+						Type:   script.Type,
+						Help:   script.Help,
 					},
 				},
 			}
@@ -168,11 +160,13 @@ func RunScript(script Script, timeout int) ExecutionResult {
 		return ExecutionResult{
 			ScriptPath: script.Path,
 			ScriptName: script.Name,
-			Metrics: []Metric{
-				Metric{
+			Metrics: []lib.Metric{
+				lib.Metric{
 					Name:   lib.GetScriptName(script.Path),
 					Labels: script.Labels,
 					Value:  float64(waitStatus.ExitStatus()),
+					Type:   script.Type,
+					Help:   script.Help,
 				},
 			},
 		}
@@ -182,7 +176,7 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	log.Trace("Running: ", script.Path)
+	log.Debug("Running: ", script.Path)
 	output, err := exec.CommandContext(ctx, "/bin/bash", "-c", script.Path).Output()
 
 	res := strings.TrimSuffix(string(output), "\n")
@@ -190,25 +184,37 @@ func RunScript(script Script, timeout int) ExecutionResult {
 
 	if err != nil {
 		return ExecutionResult{
-			Error: fmt.Errorf("Could not get output: %v", err),
+			ScriptPath: script.Path,
+			Error:      fmt.Errorf("Could not get output: %v", err),
 		}
 	}
 
-	if script.OutputType == "stdout" {
+	if script.OutputType == "raw_series" {
+		metrics := ParsePrometheusSeries(output)
+
+		return ExecutionResult{
+			ScriptPath: script.Path,
+			ScriptName: script.Name,
+			Metrics:    metrics,
+		}
+	} else if script.OutputType == "stdout" {
 		f, err := strconv.ParseFloat(res, 64)
 		if err != nil {
 			return ExecutionResult{
-				Error: errors.New("Could not parse script output as float"),
+				ScriptPath: script.Path,
+				Error:      errors.New("Could not parse script output as float"),
 			}
 		}
 		return ExecutionResult{
 			ScriptPath: script.Path,
 			ScriptName: script.Name,
-			Metrics: []Metric{
-				Metric{
+			Metrics: []lib.Metric{
+				lib.Metric{
 					Name:   lib.GetScriptName(script.Path),
 					Labels: script.Labels,
 					Value:  f,
+					Type:   script.Type,
+					Help:   script.Help,
 				},
 			},
 		}
@@ -220,21 +226,24 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	captures, err := lib.ReturnRegexCaptures(script.MetricsRegex, res)
 	if err != nil {
 		return ExecutionResult{
-			Error: errors.New("Could not parse output with regex"),
+			ScriptPath: script.Path,
+			Error:      errors.New("Could not parse output with regex"),
 		}
 	}
 
-	metrics := make([]Metric, len(captures))
+	metrics := make([]lib.Metric, len(captures))
 	i := 0
 	for k, v := range captures {
 		f, err := strconv.ParseFloat(v, 64)
 		if err != nil {
 			continue
 		}
-		metrics[i] = Metric{
+		metrics[i] = lib.Metric{
 			Name:   fmt.Sprintf("%s_%s", lib.GetScriptName(script.Path), k),
 			Labels: script.Labels,
 			Value:  f,
+			Type:   script.Type,
+			Help:   script.Help,
 		}
 		i++
 	}
@@ -243,4 +252,45 @@ func RunScript(script Script, timeout int) ExecutionResult {
 		ScriptName: script.Name,
 		Metrics:    metrics,
 	}
+}
+
+// ParsePrometheusSeries is ...
+func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
+	p := textparse.NewPromParser(rawSeriesOutput)
+
+	var resLabels labels.Labels
+	labelsMap := map[string]string{}
+
+	metrics := make([]lib.Metric, 0)
+	var metricName string
+
+	for {
+		entry, err := p.Next()
+		if err == io.EOF {
+			break
+		}
+
+		switch entry {
+		case textparse.EntrySeries:
+			_, _, v := p.Series()
+			p.Metric(&resLabels)
+			for _, lbl := range resLabels {
+				if lbl.Name == "__name__" {
+					metricName = lbl.Value
+					continue
+				}
+				labelsMap[lbl.Name] = lbl.Value
+			}
+			metrics = append(metrics, lib.Metric{
+				Name:   metricName,
+				Labels: labelsMap,
+				Value:  v,
+			})
+		}
+		resLabels = labels.Labels{}
+		labelsMap = make(map[string]string)
+
+	}
+
+	return metrics
 }

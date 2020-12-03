@@ -1,3 +1,5 @@
+# github.com/cespare/xxhash v1.1.0
+github.com/cespare/xxhash
 # github.com/go-yaml/yaml v2.1.0+incompatible
 ## explicit
 github.com/go-yaml/yaml
@@ -8,6 +10,11 @@ github.com/google/renameio
 github.com/inconshreveable/mousetrap
 # github.com/konsorten/go-windows-terminal-sequences v1.0.3
 github.com/konsorten/go-windows-terminal-sequences
+# github.com/prometheus/prometheus v2.5.0+incompatible
+## explicit
+github.com/prometheus/prometheus/pkg/labels
+github.com/prometheus/prometheus/pkg/textparse
+github.com/prometheus/prometheus/pkg/value
 # github.com/sirupsen/logrus v1.6.0
 ## explicit
 github.com/sirupsen/logrus
