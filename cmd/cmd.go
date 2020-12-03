@@ -100,10 +100,37 @@ func run() {
 	go func(execSuccess *[]string) {
 		log.Info("Waiting for results...")
 		for res := range work.ResultsChan {
-			for _, metric := range res.Metrics {
-				series = append(series, metric)
+
+			series = append(series, lib.Metric{
+				Name: "script_loaded",
+				Labels: map[string]string{
+					"script": res.ScriptPath,
+				},
+				Value: 1.0,
+				Type:  "gauge",
+				Help:  "indicates that a script has been identified to be executed.",
+			})
+
+			lastRunSuccess := 0.0
+
+			if res.Error == nil {
+				for _, metric := range res.Metrics {
+					series = append(series, metric)
+				}
+				*execSuccess = append(*execSuccess, res.ScriptPath)
+				lastRunSuccess = 1.0
 			}
-			*execSuccess = append(*execSuccess, res.ScriptPath)
+
+			series = append(series, lib.Metric{
+				Name: "script_last_run_success",
+				Labels: map[string]string{
+					"script": res.ScriptPath,
+				},
+				Value: lastRunSuccess,
+				Type:  "gauge",
+				Help:  "indicates that a script has been identified to be executed.",
+			})
+
 			log.Debug("Decrementing waitgroup")
 			work.Wg.Done()
 		}

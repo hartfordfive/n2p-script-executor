@@ -2,8 +2,13 @@
 scripts:
   - name: check_dummy
     type: gauge
-    help: Just a dummy check metrics
+    help: Just a dummy check metric, with zero exit code
     path: "demo_scripts/check_dummy"
+    output_type: exit_code
+  - name: check_dummy_exit1
+    type: gauge
+    help: Just a dummy check metric, with non-zero exit code
+    path: "demo_scripts/check_dummy_exit1"
     output_type: exit_code
   - name: check_google_http
     type: gauge
@@ -33,4 +38,7 @@ scripts:
       server_type: web
   - name: check_raw_metrics
     path: "demo_scripts/check_raw_metrics"
+    output_type: "raw_series"
+  - name: check_raw_metrics_exit1
+    path: "demo_scripts/check_raw_metrics_exit1"
     output_type: "raw_series"

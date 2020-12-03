@@ -109,7 +109,8 @@ func RunScript(script Script, timeout int) ExecutionResult {
 
 		if ctx.Err() == context.DeadlineExceeded {
 			return ExecutionResult{
-				Error: errors.New("Script execution deadline exceeded"),
+				ScriptPath: script.Path,
+				Error:      errors.New("Script execution deadline exceeded"),
 			}
 		}
 		if execErr != nil {
@@ -134,7 +135,8 @@ func RunScript(script Script, timeout int) ExecutionResult {
 			}
 			log.Error(execErr.Error())
 			return ExecutionResult{
-				Error: errors.New("Could not get exit code"),
+				ScriptPath: script.Path,
+				Error:      errors.New("Could not get exit code"),
 			}
 		}
 		if exitError, ok := execErr.(*exec.ExitError); ok {
@@ -182,7 +184,8 @@ func RunScript(script Script, timeout int) ExecutionResult {
 
 	if err != nil {
 		return ExecutionResult{
-			Error: fmt.Errorf("Could not get output: %v", err),
+			ScriptPath: script.Path,
+			Error:      fmt.Errorf("Could not get output: %v", err),
 		}
 	}
 
@@ -198,7 +201,8 @@ func RunScript(script Script, timeout int) ExecutionResult {
 		f, err := strconv.ParseFloat(res, 64)
 		if err != nil {
 			return ExecutionResult{
-				Error: errors.New("Could not parse script output as float"),
+				ScriptPath: script.Path,
+				Error:      errors.New("Could not parse script output as float"),
 			}
 		}
 		return ExecutionResult{
@@ -222,7 +226,8 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	captures, err := lib.ReturnRegexCaptures(script.MetricsRegex, res)
 	if err != nil {
 		return ExecutionResult{
-			Error: errors.New("Could not parse output with regex"),
+			ScriptPath: script.Path,
+			Error:      errors.New("Could not parse output with regex"),
 		}
 	}
 
@@ -282,6 +287,8 @@ func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
 				Value:  v,
 			})
 		}
+		resLabels = labels.Labels{}
+		labelsMap = make(map[string]string)
 
 	}
 
