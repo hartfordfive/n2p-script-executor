@@ -194,7 +194,7 @@ func RunScript(script Script, timeout int) ExecutionResult {
 		if len(metrics) == 0 {
 			return ExecutionResult{
 				ScriptPath: script.Path,
-				Error:      fmt.Errorf("Could not get output: %v", err),
+				Error:      fmt.Errorf("No valid series detected in %s", script.Path),
 			}
 		}
 		return ExecutionResult{
