@@ -39,7 +39,7 @@ build-release: all
 	tar -cvzf ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-darwin-$(ARCH).tar.gz ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-darwin-$(ARCH)
 
 build-debug:
-	CGO_ENABLED=0 GOOS=${OS} GOARCH=amd64 $(GOBUILD) -ldflags "-X $(PACKAGE_BASE)/version.CommitHash=$(GITHASH) -X $(PACKAGE_BASE)/version.BuildDate=${BUILDDATE} -X ${PACKAGE_BASE}/version.Version=${VERSION}" -o ${BUILD_DIR}$(BINARY_NAME) -v
+	CGO_ENABLED=0 GOOS=${OS} GOARCH=amd64 $(GOBUILD) -ldflags "-X $(PACKAGE_BASE)/version.CommitHash=$(GITHASH) -X $(PACKAGE_BASE)/version.BuildDate=${BUILDDATE} -X ${PACKAGE_BASE}/version.Version=${VERSION}" -o ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-${OS}-$(ARCH)-debug -v
 
 test: 
 	$(GOTEST) -v ./...
