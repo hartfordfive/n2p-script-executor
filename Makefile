@@ -33,8 +33,10 @@ build:
 build-all:
 	CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} $(GOBUILD) -ldflags "-s -w -X $(PACKAGE_BASE)/version.CommitHash=$(GITHASH) -X $(PACKAGE_BASE)/version.BuildDate=$(BUILDDATE) -X ${PACKAGE_BASE}/version.Version=${VERSION}" -o ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-linux-$(ARCH) -v
 	CGO_ENABLED=0 GOOS=darwin GOARCH=${ARCH} $(GOBUILD) -ldflags "-s -w -X $(PACKAGE_BASE)/version.CommitHash=$(GITHASH) -X $(PACKAGE_BASE)/version.BuildDate=$(BUILDDATE) -X ${PACKAGE_BASE}/version.Version=${VERSION}" -o ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-darwin-$(ARCH) -v
-	CGO_ENABLED=0 GOOS=windows GOARCH=${ARCH} $(GOBUILD) -ldflags "-s -w -X $(PACKAGE_BASE)/version.CommitHash=$(GITHASH) -X $(PACKAGE_BASE)/version.BuildDate=$(BUILDDATE) -X ${PACKAGE_BASE}/version.Version=${VERSION}" -o ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-windows-$(ARCH) -v
 
+build-release: all
+    tar -cvzf ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-linux-$(ARCH).tar.gz ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-linux-$(ARCH)
+    tar -cvzf ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-darwin-$(ARCH).tar.gz ${BUILD_DIR}$(BASE_NAME)-$(VERSION)-darwin-$(ARCH)
 
 build-debug:
 	CGO_ENABLED=0 GOOS=${OS} GOARCH=amd64 $(GOBUILD) -ldflags "-X $(PACKAGE_BASE)/version.CommitHash=$(GITHASH) -X $(PACKAGE_BASE)/version.BuildDate=${BUILDDATE} -X ${PACKAGE_BASE}/version.Version=${VERSION}" -o ${BUILD_DIR}$(BINARY_NAME) -v

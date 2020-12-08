@@ -1,4 +1,7 @@
 
+## 0.4.0
+* 
+
 ## 0.3.0
 * Added missing re-initialization of metric labels at the end of each script execution as the absence of this was causing the labels to be added to each next script execution result.  This caused series to contain labels that did not belong to them.
 * Specified `ScriptPath` to the `ExecutonResult` struct even when an error is encountered. 

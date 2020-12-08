@@ -95,20 +95,25 @@ func run() {
 	}
 
 	var series []lib.Metric
-	var execSuccess = make([]string, 0, len(cnf.Scripts))
+	scriptLoadedSeries := []lib.Metric{}
+	scriptExecSuccessSeries := []lib.Metric{}
+	//var execSuccess = make([]string, 0, len(cnf.Scripts))
+	execSuccess := []string{}
+	var execFail = make([]string, 0)
 
-	go func(execSuccess *[]string) {
+	go func(execSuccess *[]string, execFail *[]string) {
 		log.Info("Waiting for results...")
+
 		for res := range work.ResultsChan {
 
-			series = append(series, lib.Metric{
+			scriptLoadedSeries = append(scriptLoadedSeries, lib.Metric{
 				Name: "script_loaded",
 				Labels: map[string]string{
 					"script": res.ScriptPath,
 				},
 				Value: 1.0,
 				Type:  "gauge",
-				Help:  "indicates that a script has been identified to be executed.",
+				Help:  "indicates that a script has been identified to be executed",
 			})
 
 			lastRunSuccess := 0.0
@@ -119,27 +124,38 @@ func run() {
 				}
 				*execSuccess = append(*execSuccess, res.ScriptPath)
 				lastRunSuccess = 1.0
+			} else {
+				*execFail = append(*execFail, res.ScriptPath)
 			}
 
-			series = append(series, lib.Metric{
+			scriptExecSuccessSeries = append(scriptExecSuccessSeries, lib.Metric{
 				Name: "script_last_run_success",
 				Labels: map[string]string{
 					"script": res.ScriptPath,
 				},
 				Value: lastRunSuccess,
 				Type:  "gauge",
-				Help:  "indicates that a script has been identified to be executed.",
+				Help:  "iindicates when a script was last executed successfully",
 			})
 
 			log.Debug("Decrementing waitgroup")
 			work.Wg.Done()
 		}
+
 		log.Info("Done processing results")
 
-	}(&execSuccess)
+	}(&execSuccess, &execFail)
 
 	log.Info("Waiting for all script executions to be completed...")
 	work.Wg.Wait()
+
+	for _, res := range scriptLoadedSeries {
+		series = append(series, res)
+	}
+
+	for _, res := range scriptExecSuccessSeries {
+		series = append(series, res)
+	}
 
 	seriesOutput := lib.GenerateSeries(series, execSuccess)
 

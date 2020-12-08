@@ -25,10 +25,12 @@ type Metric struct {
 	Help   string
 }
 
-func (m Metric) String() string {
+func (m Metric) String(addHelp bool) string {
 	output := ""
-	output += fmt.Sprintf("# TYPE n2p_script_exec_%s %s\n", m.Name, m.Type)
-	output += fmt.Sprintf("# HELP n2p_script_exec_%s %s\n", m.Name, m.Help)
+	if addHelp {
+		output += fmt.Sprintf("# TYPE n2p_script_exec_%s %s\n", m.Name, m.Type)
+		output += fmt.Sprintf("# HELP n2p_script_exec_%s %s\n", m.Name, m.Help)
+	}
 	if len(m.Labels) >= 1 {
 		flattendLabels := []string{}
 		for k, v := range m.Labels {
@@ -123,11 +125,21 @@ func convertToIntString(val float64) string {
 
 // GenerateSeries takes the array of TextfileCollectorMetric and writes them to the destination file
 func GenerateSeries(metrics []Metric, execSuccess []string) string {
+
 	data := ""
+	typeHelpLine := map[string]bool{}
+	addHelp := false
+
 	for _, metric := range metrics {
-		log.Debugf("Adding metric: %s", metric.String())
-		data += metric.String() + "\n"
+		if _, ok := typeHelpLine[metric.Name]; !ok {
+			addHelp = true
+			typeHelpLine[metric.Name] = true
+		}
+		log.Debugf("Adding metric: %s", metric.String(addHelp))
+		data += metric.String(addHelp) + "\n"
+		addHelp = false
 	}
+
 	data += "# TYPE n2p_script_exec_lastrun counter\n"
 	data += "# HELP n2p_script_exec_lastrun Time when the script was last executed\n"
 	for _, script := range execSuccess {
@@ -149,7 +161,7 @@ func generateScriptCheckpointMetric(scriptName string) string {
 // GenerateExecutorCheckpointMetric is ...
 func GenerateExecutorCheckpointMetric() string {
 	return fmt.Sprintf(
-		"n2p_script_exec_lastrun %d",
+		"n2p_script_exec_last_execution %d",
 		(time.Now().UnixNano() / int64(time.Millisecond)),
 	)
 }

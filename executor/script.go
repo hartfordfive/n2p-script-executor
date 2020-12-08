@@ -180,9 +180,9 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	output, err := exec.CommandContext(ctx, "/bin/bash", "-c", script.Path).Output()
 
 	res := strings.TrimSuffix(string(output), "\n")
-	log.Debug("Script output: ", res)
+	log.Debugf("Script output for %s: %s", script.Path, res)
 
-	if err != nil {
+	if err != nil && script.OutputType != "raw_series" {
 		return ExecutionResult{
 			ScriptPath: script.Path,
 			Error:      fmt.Errorf("Could not get output: %v", err),
@@ -191,7 +191,12 @@ func RunScript(script Script, timeout int) ExecutionResult {
 
 	if script.OutputType == "raw_series" {
 		metrics := ParsePrometheusSeries(output)
-
+		if len(metrics) == 0 {
+			return ExecutionResult{
+				ScriptPath: script.Path,
+				Error:      fmt.Errorf("Could not get output: %v", err),
+			}
+		}
 		return ExecutionResult{
 			ScriptPath: script.Path,
 			ScriptName: script.Name,
@@ -275,6 +280,10 @@ func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
 			_, _, v := p.Series()
 			p.Metric(&resLabels)
 			for _, lbl := range resLabels {
+				if strings.Trim(lbl.Value, " ") == "" {
+					log.Warnf("Skipping label %s as it has an empty value", lbl.Name)
+					continue
+				}
 				if lbl.Name == "__name__" {
 					metricName = lbl.Value
 					continue
