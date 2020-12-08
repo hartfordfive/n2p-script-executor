@@ -97,11 +97,9 @@ func run() {
 	var series []lib.Metric
 	scriptLoadedSeries := []lib.Metric{}
 	scriptExecSuccessSeries := []lib.Metric{}
-	//var execSuccess = make([]string, 0, len(cnf.Scripts))
-	execSuccess := []string{}
-	var execFail = make([]string, 0)
+	var execSuccess = make([]string, 0, len(cnf.Scripts))
 
-	go func(execSuccess *[]string, execFail *[]string) {
+	go func(execSuccess *[]string) {
 		log.Info("Waiting for results...")
 
 		for res := range work.ResultsChan {
@@ -124,8 +122,6 @@ func run() {
 				}
 				*execSuccess = append(*execSuccess, res.ScriptPath)
 				lastRunSuccess = 1.0
-			} else {
-				*execFail = append(*execFail, res.ScriptPath)
 			}
 
 			scriptExecSuccessSeries = append(scriptExecSuccessSeries, lib.Metric{
@@ -144,7 +140,7 @@ func run() {
 
 		log.Info("Done processing results")
 
-	}(&execSuccess, &execFail)
+	}(&execSuccess)
 
 	log.Info("Waiting for all script executions to be completed...")
 	work.Wg.Wait()
