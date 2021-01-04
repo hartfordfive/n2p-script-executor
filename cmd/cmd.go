@@ -1,14 +1,11 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/hartfordfive/n2p-script-executor/executor"
-	"github.com/hartfordfive/n2p-script-executor/lib"
 	"github.com/hartfordfive/n2p-script-executor/logging"
 	"github.com/hartfordfive/n2p-script-executor/version"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +47,12 @@ var RunCmd = &cobra.Command{
 	Long:  `Runs the script execution, which will run all scripts in the specified directory.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logging.SetLogLevel(FlagLogLevel)
-		run()
+		executor.Run(executor.ExecutorConfig{
+			OutputFilePath: FlagOutputFile,
+			ConfigFilePath: FlagConfig,
+			LogLevel:       FlagLogLevel,
+			Simulate:       FlagSimulate,
+		})
 		os.Exit(0)
 
 	},
@@ -65,111 +67,4 @@ var VersionCmd = &cobra.Command{
 		version.PrintVersion()
 		os.Exit(0)
 	},
-}
-
-func run() {
-
-	cnf, err := executor.LoadConfig(FlagConfig)
-	if err != nil {
-		log.Errorln(err)
-		os.Exit(1)
-	}
-
-	numWorkers := 4
-	if len(cnf.Scripts) < 4 {
-		numWorkers = len(cnf.Scripts)
-	}
-
-	work := executor.NewWorkQueue(4, numWorkers, len(cnf.Scripts))
-	log.Info("Starting script execution workers...")
-	work.Process()
-
-	log.Info("Submitting scripts to be executed")
-	validOutputTypes := []string{"exit_code", "stdout", "multi_metric", "raw_series"}
-	for _, s := range cnf.Scripts {
-		if !lib.StringIsInSlice(s.OutputType, validOutputTypes) {
-			log.Error("Invalid script output type: ", s.OutputType)
-			continue
-		}
-		work.SubmitTask(s)
-	}
-
-	var series []lib.Metric
-	scriptLoadedSeries := []lib.Metric{}
-	scriptExecSuccessSeries := []lib.Metric{}
-	var execSuccess = make([]string, 0, len(cnf.Scripts))
-
-	go func(execSuccess *[]string) {
-		log.Info("Waiting for results...")
-
-		for res := range work.ResultsChan {
-
-			scriptLoadedSeries = append(scriptLoadedSeries, lib.Metric{
-				Name: "script_loaded",
-				Labels: map[string]string{
-					"script": res.ScriptPath,
-				},
-				Value: 1.0,
-				Type:  "gauge",
-				Help:  "indicates that a script has been identified to be executed",
-			})
-
-			lastRunSuccess := 0.0
-
-			if res.Error == nil {
-				for _, metric := range res.Metrics {
-					series = append(series, metric)
-				}
-				*execSuccess = append(*execSuccess, res.ScriptPath)
-				lastRunSuccess = 1.0
-			}
-
-			scriptExecSuccessSeries = append(scriptExecSuccessSeries, lib.Metric{
-				Name: "script_last_run_success",
-				Labels: map[string]string{
-					"script": res.ScriptPath,
-				},
-				Value: lastRunSuccess,
-				Type:  "gauge",
-				Help:  "iindicates when a script was last executed successfully",
-			})
-
-			log.Debug("Decrementing waitgroup")
-			work.Wg.Done()
-		}
-
-		log.Info("Done processing results")
-
-	}(&execSuccess)
-
-	log.Info("Waiting for all script executions to be completed...")
-	work.Wg.Wait()
-
-	for _, res := range scriptLoadedSeries {
-		series = append(series, res)
-	}
-
-	for _, res := range scriptExecSuccessSeries {
-		series = append(series, res)
-	}
-
-	seriesOutput := lib.GenerateSeries(series, execSuccess)
-
-	log.Infof("Writing resulting series to %s", FlagOutputFile)
-	if !FlagSimulate {
-		if len(series) >= 1 {
-			// Write the series to the output file
-			lib.WriteToFile(FlagOutputFile, seriesOutput)
-			os.Exit(0)
-
-		}
-		os.Exit(1)
-	}
-
-	fmt.Fprintf(os.Stdout, seriesOutput)
-	if len(series) >= 1 {
-		os.Exit(0)
-	}
-
-	os.Exit(1)
 }
