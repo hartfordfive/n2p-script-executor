@@ -183,16 +183,7 @@ func RunScript(script Script, timeout int) ExecutionResult {
 		}
 	}
 
-	// In this case, it's either a single metrics (stdout) or a multiple string (multi_metric) output, which will use a supplied regex
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Duration(int(timeout))*time.Second)
-	// defer cancel()
-
-	// log.Debugf("Running %s with timeout of %v", script.Path, (time.Duration(int(timeout)) * time.Second))
-
-	// cmd := exec.CommandContext(ctx, "/bin/bash", "-c", script.Path)
-	// output, outErr := cmd.CombinedOutput()
-
-	// --------------------------------
+	log.Debugf("Running %s with timeout of %v", script.Path, (time.Duration(int(timeout)) * time.Second))
 
 	// The following block of code is used instead of CommandContext as the context
 	// doesn't terminate sub-processes.
@@ -201,6 +192,7 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	cmd := exec.Command("/bin/bash", "-c", script.Path)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	killChanRes := make(chan ExecutionResult, 1)
+
 	time.AfterFunc(time.Duration(int(timeout))*time.Second, func() {
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		duration := time.Since(execStart)
