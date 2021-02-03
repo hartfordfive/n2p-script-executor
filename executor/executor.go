@@ -69,7 +69,7 @@ func Run(cfg ExecutorConfig) {
 			})
 
 			scriptLoadedSeries = append(scriptLoadedSeries, lib.Metric{
-				Name: "script_total_execution_time_ms",
+				Name: "script_last_execution_time_ms",
 				Labels: map[string]string{
 					"script": res.ScriptPath,
 				},
