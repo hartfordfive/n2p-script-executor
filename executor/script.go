@@ -211,7 +211,7 @@ func RunScript(script Script, timeout int) ExecutionResult {
 			TotalExecTime: execTotalMs,
 		}
 	})
-	output, outErr := cmd.CombinedOutput()
+	output, outErr := cmd.Output()
 
 	for {
 		select {
@@ -226,15 +226,6 @@ func RunScript(script Script, timeout int) ExecutionResult {
 
 	duration := time.Since(execStart)
 	execTotalMs := duration.Nanoseconds() / 1000000
-	//output := stdout.Bytes()
-
-	// if ctx.Err() == context.DeadlineExceeded {
-	// 	return ExecutionResult{
-	// 		ScriptPath:    script.Path,
-	// 		Error:         errors.New("Script execution timed out"),
-	// 		TotalExecTime: execTotalMs,
-	// 	}
-	// }
 
 	res := strings.TrimSuffix(string(output), "\n")
 	log.Debugf("Script output for %s: %s", script.Path, res)
