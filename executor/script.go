@@ -30,10 +30,11 @@ var (
 
 // ExecutionResult is a struct generated with the execution result of the script
 type ExecutionResult struct {
-	ScriptPath string
-	ScriptName string
-	Metrics    []lib.Metric
-	Error      error
+	ScriptPath    string
+	ScriptName    string
+	Metrics       []lib.Metric
+	Error         error
+	TotalExecTime int64
 }
 
 // Script is the struct describing the script to be executed
@@ -50,7 +51,8 @@ type Script struct {
 
 // Config is the struct that maps to the yaml configuration
 type Config struct {
-	Scripts []Script `yaml:"scripts"`
+	SeriesPrefix string   `yaml:"series_prefix"`
+	Scripts      []Script `yaml:"scripts"`
 }
 
 // LoadConfig loads the yaml config from the specified file path
@@ -58,7 +60,6 @@ func LoadConfig(path string) (*Config, error) {
 	var conf Config
 	content, err := ioutil.ReadFile(path)
 	err = yaml.Unmarshal(content, &conf)
-	//log.Info("Load():", conf)
 	if err != nil {
 		return &conf, err
 	}
@@ -98,6 +99,10 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	}
 	script.Labels["script"] = script.Path
 
+	execStart := time.Now()
+
+	log.Debug("Initial timeout value: ", timeout)
+
 	if script.OutputType == "exit_code" {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
@@ -107,10 +112,14 @@ func RunScript(script Script, timeout int) ExecutionResult {
 		var waitStatus syscall.WaitStatus
 		execErr := cmd.Run()
 
+		duration := time.Since(execStart)
+		execTotalMs := duration.Nanoseconds() / 1000000
+
 		if ctx.Err() == context.DeadlineExceeded {
 			return ExecutionResult{
-				ScriptPath: script.Path,
-				Error:      errors.New("Script execution deadline exceeded"),
+				ScriptPath:    script.Path,
+				Error:         errors.New("Script execution deadline exceeded"),
+				TotalExecTime: execTotalMs,
 			}
 		}
 		if execErr != nil {
@@ -130,13 +139,15 @@ func RunScript(script Script, timeout int) ExecutionResult {
 							Help:   script.Help,
 						},
 					},
+					TotalExecTime: execTotalMs,
 				}
 
 			}
 			log.Error(execErr.Error())
 			return ExecutionResult{
-				ScriptPath: script.Path,
-				Error:      errors.New("Could not get exit code"),
+				ScriptPath:    script.Path,
+				Error:         errors.New("Could not get exit code"),
+				TotalExecTime: execTotalMs,
 			}
 		}
 		if exitError, ok := execErr.(*exec.ExitError); ok {
@@ -153,6 +164,7 @@ func RunScript(script Script, timeout int) ExecutionResult {
 						Help:   script.Help,
 					},
 				},
+				TotalExecTime: execTotalMs,
 			}
 		}
 		// Success
@@ -169,23 +181,44 @@ func RunScript(script Script, timeout int) ExecutionResult {
 					Help:   script.Help,
 				},
 			},
+			TotalExecTime: execTotalMs,
 		}
 	}
 
 	// In this case, it's either a single metrics (stdout) or a multiple string (multi_metric) output, which will use a supplied regex
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(int(timeout))*time.Second)
 	defer cancel()
 
-	log.Debug("Running: ", script.Path)
-	output, err := exec.CommandContext(ctx, "/bin/bash", "-c", script.Path).Output()
+	log.Debugf("Running %s with timeout of %v", script.Path, (time.Duration(int(timeout)) * time.Second))
+
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", script.Path)
+	// var stdout, stderr bytes.Buffer
+	// cmd.Stdout = &stdout
+	// cmd.Stderr = &stderr
+
+	output, outErr := cmd.CombinedOutput()
+	//outErr := cmd.Run()
+
+	duration := time.Since(execStart)
+	execTotalMs := duration.Nanoseconds() / 1000000
+	//output := stdout.Bytes()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		return ExecutionResult{
+			ScriptPath:    script.Path,
+			Error:         errors.New("Script execution timed out"),
+			TotalExecTime: execTotalMs,
+		}
+	}
 
 	res := strings.TrimSuffix(string(output), "\n")
 	log.Debugf("Script output for %s: %s", script.Path, res)
 
-	if err != nil && script.OutputType != "raw_series" {
+	if outErr != nil && script.OutputType != "raw_series" {
 		return ExecutionResult{
-			ScriptPath: script.Path,
-			Error:      fmt.Errorf("Could not get output: %v", err),
+			ScriptPath:    script.Path,
+			Error:         fmt.Errorf("Could not get output: %v", outErr),
+			TotalExecTime: execTotalMs,
 		}
 	}
 
@@ -206,8 +239,9 @@ func RunScript(script Script, timeout int) ExecutionResult {
 		f, err := strconv.ParseFloat(res, 64)
 		if err != nil {
 			return ExecutionResult{
-				ScriptPath: script.Path,
-				Error:      errors.New("Could not parse script output as float"),
+				ScriptPath:    script.Path,
+				Error:         errors.New("Could not parse script output as float"),
+				TotalExecTime: execTotalMs,
 			}
 		}
 		return ExecutionResult{
@@ -222,6 +256,7 @@ func RunScript(script Script, timeout int) ExecutionResult {
 					Help:   script.Help,
 				},
 			},
+			TotalExecTime: execTotalMs,
 		}
 	}
 
@@ -231,8 +266,9 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	captures, err := lib.ReturnRegexCaptures(script.MetricsRegex, res)
 	if err != nil {
 		return ExecutionResult{
-			ScriptPath: script.Path,
-			Error:      errors.New("Could not parse output with regex"),
+			ScriptPath:    script.Path,
+			Error:         errors.New("Could not parse output with regex"),
+			TotalExecTime: execTotalMs,
 		}
 	}
 
@@ -253,9 +289,10 @@ func RunScript(script Script, timeout int) ExecutionResult {
 		i++
 	}
 	return ExecutionResult{
-		ScriptPath: script.Path,
-		ScriptName: script.Name,
-		Metrics:    metrics,
+		ScriptPath:    script.Path,
+		ScriptName:    script.Name,
+		Metrics:       metrics,
+		TotalExecTime: execTotalMs,
 	}
 }
 

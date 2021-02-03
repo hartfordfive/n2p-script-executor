@@ -1,4 +1,12 @@
 
+
+## 0.5.0
+* Added new metric which exposes the build info
+* Added ability to customize the current `n2p_script_exec` series prefix to another value.  
+* Updated some logging statements to reduce INFO level messages
+* Fixed issue with execution of `raw_series` and `stdout` type scripts where no timeout was being applied to the script execution.
+** Added a new `script_exec_script_total_execution_time` metric to track the total execution time of each script
+
 ## 0.4.0
 * Ensured that `TYPE` and `HELP` metadata lines are only added once for every metric name as being defined multiple times was causing issues for the node_exporter textfile collector module.
 * Renamed the `n2p_script_exec_lastrun` metric to `n2p_script_exec_last_execution` as that metrics should only be used with an associated script label.  The version without the script label is used to indicate the last time the application was executed.
