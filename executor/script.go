@@ -101,8 +101,6 @@ func RunScript(script Script, timeout int) ExecutionResult {
 
 	execStart := time.Now()
 
-	log.Debug("Initial timeout value: ", timeout)
-
 	if script.OutputType == "exit_code" {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
@@ -186,30 +184,57 @@ func RunScript(script Script, timeout int) ExecutionResult {
 	}
 
 	// In this case, it's either a single metrics (stdout) or a multiple string (multi_metric) output, which will use a supplied regex
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(int(timeout))*time.Second)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(context.Background(), time.Duration(int(timeout))*time.Second)
+	// defer cancel()
 
-	log.Debugf("Running %s with timeout of %v", script.Path, (time.Duration(int(timeout)) * time.Second))
+	// log.Debugf("Running %s with timeout of %v", script.Path, (time.Duration(int(timeout)) * time.Second))
 
-	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", script.Path)
-	// var stdout, stderr bytes.Buffer
-	// cmd.Stdout = &stdout
-	// cmd.Stderr = &stderr
+	// cmd := exec.CommandContext(ctx, "/bin/bash", "-c", script.Path)
+	// output, outErr := cmd.CombinedOutput()
 
+	// --------------------------------
+
+	// The following block of code is used instead of CommandContext as the context
+	// doesn't terminate sub-processes.
+	// See: https://github.com/golang/go/issues/22485
+
+	cmd := exec.Command("/bin/bash", "-c", script.Path)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	killChanRes := make(chan ExecutionResult, 1)
+	time.AfterFunc(time.Duration(int(timeout))*time.Second, func() {
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		duration := time.Since(execStart)
+		execTotalMs := duration.Nanoseconds() / 1000000
+		killChanRes <- ExecutionResult{
+			ScriptPath:    script.Path,
+			Error:         errors.New("Script execution timed out"),
+			TotalExecTime: execTotalMs,
+		}
+	})
 	output, outErr := cmd.CombinedOutput()
-	//outErr := cmd.Run()
+
+	for {
+		select {
+		case res := <-killChanRes:
+			return res
+		case <-time.After(time.Duration(int(timeout)) * time.Second):
+			break
+		}
+	}
+
+	// --------------------------
 
 	duration := time.Since(execStart)
 	execTotalMs := duration.Nanoseconds() / 1000000
 	//output := stdout.Bytes()
 
-	if ctx.Err() == context.DeadlineExceeded {
-		return ExecutionResult{
-			ScriptPath:    script.Path,
-			Error:         errors.New("Script execution timed out"),
-			TotalExecTime: execTotalMs,
-		}
-	}
+	// if ctx.Err() == context.DeadlineExceeded {
+	// 	return ExecutionResult{
+	// 		ScriptPath:    script.Path,
+	// 		Error:         errors.New("Script execution timed out"),
+	// 		TotalExecTime: execTotalMs,
+	// 	}
+	// }
 
 	res := strings.TrimSuffix(string(output), "\n")
 	log.Debugf("Script output for %s: %s", script.Path, res)
