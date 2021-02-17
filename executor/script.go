@@ -36,40 +36,6 @@ type ExecutionResult struct {
 	TotalExecTime int64
 }
 
-// // Script is the struct describing the script to be executed
-// type Script struct {
-// 	Name               string            `yaml:"name"`
-// 	Type               string            `yaml:"type"`
-// 	Help               string            `yaml:"help"`
-// 	OutputType         string            `yaml:"output_type"`
-// 	Path               string            `yaml:"path"`
-// 	OverrideMetricName string            `yaml:"override_metric_name"`
-// 	Labels             map[string]string `yaml:"labels"`
-// 	MetricsRegex       string            `yaml:"metrics_regex"`
-// }
-
-// // Config is the struct that maps to the yaml configuration
-// type Config struct {
-// 	SeriesPrefix string   `yaml:"series_prefix"`
-// 	Scripts      []Script `yaml:"scripts"`
-// }
-
-// // LoadConfig loads the yaml config from the specified file path
-// func LoadConfig(path string) (*Config, error) {
-// 	var conf Config
-// 	content, err := ioutil.ReadFile(path)
-// 	err = yaml.Unmarshal(content, &conf)
-// 	if err != nil {
-// 		return &conf, err
-// 	}
-// 	return &conf, err
-// }
-
-// // Print is used to print the config to stdout
-// func (c *Config) Print() {
-// 	log.Println(c)
-// }
-
 // GetScripts returns the list of scripts in the provided directory when in simple mode
 func GetScripts(scriptsDir string) ([]string, error) {
 	var files []string
@@ -197,9 +163,6 @@ func RunScript(script config.Script) ExecutionResult {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	killChanRes := make(chan ExecutionResult, 1)
-	//termChanRes := make(chan bool, 1)
-
-	// -------------------------------------------
 
 	ctx := context.Background()
 	ctx, cancelTimeout := context.WithCancel(ctx)
@@ -225,8 +188,6 @@ func RunScript(script config.Script) ExecutionResult {
 					err)
 			}
 		case <-ctx.Done():
-			// If the request gets cancelled, log it
-			// to STDERR
 			log.Debugf("timeout canceled for %s (output type: %s)", script.Path, script.OutputType)
 		}
 	}(ctx)
