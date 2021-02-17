@@ -14,8 +14,7 @@ import (
 
 // Script is the struct describing the script to be executed
 type Script struct {
-	Name string `yaml:"name"`
-	//Timeout            time.Duration     `yaml:"timeout"`
+	Name               string            `yaml:"name"`
 	Timeout            string            `yaml:"timeout"`
 	Type               string            `yaml:"type"`
 	Help               string            `yaml:"help"`
@@ -30,13 +29,6 @@ type Script struct {
 type Config struct {
 	SeriesPrefix string   `yaml:"series_prefix"`
 	Scripts      []Script `yaml:"scripts"`
-}
-
-func initializeScript() *Script {
-	return &Script{
-		Timeout:    "5s",
-		OutputType: "raw_series",
-	}
 }
 
 // Load loads the yaml config from the specified file path
