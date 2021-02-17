@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hartfordfive/n2p-script-executor/config"
 	"github.com/hartfordfive/n2p-script-executor/lib"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,7 +20,7 @@ type ExecutorConfig struct {
 // Run runs the executor
 func Run(cfg ExecutorConfig) {
 
-	cnf, err := LoadConfig(cfg.ConfigFilePath)
+	cnf, err := config.Load(cfg.ConfigFilePath)
 	if err != nil {
 		log.Errorln(err)
 		os.Exit(1)
@@ -39,12 +40,7 @@ func Run(cfg ExecutorConfig) {
 	work.Process()
 
 	log.Info("Submitting scripts to be executed")
-	validOutputTypes := []string{"exit_code", "stdout", "multi_metric", "raw_series"}
 	for _, s := range cnf.Scripts {
-		if !lib.StringIsInSlice(s.OutputType, validOutputTypes) {
-			log.Error("Invalid script output type: ", s.OutputType)
-			continue
-		}
 		work.SubmitTask(s)
 	}
 

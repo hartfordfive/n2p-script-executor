@@ -4,13 +4,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hartfordfive/n2p-script-executor/config"
 	log "github.com/sirupsen/logrus"
 )
 
 // WorkQueue is the struct for the work queue
 type WorkQueue struct {
 	numWorkers            int
-	pendingScriptWorkChan chan Script
+	pendingScriptWorkChan chan config.Script
 	ResultsChan           chan ExecutionResult
 	doneChan              chan interface{}
 	Wg                    *sync.WaitGroup
@@ -20,7 +21,7 @@ type WorkQueue struct {
 func NewWorkQueue(capacity int, maxWorkers int, totalScripts int) *WorkQueue {
 	wq := &WorkQueue{
 		numWorkers:            maxWorkers,
-		pendingScriptWorkChan: make(chan Script, capacity),
+		pendingScriptWorkChan: make(chan config.Script, capacity),
 		ResultsChan:           make(chan ExecutionResult, capacity),
 		doneChan:              make(chan interface{}, 1),
 		Wg:                    &sync.WaitGroup{},
@@ -29,7 +30,7 @@ func NewWorkQueue(capacity int, maxWorkers int, totalScripts int) *WorkQueue {
 }
 
 // SubmitTask adds a new script execution task to the channel
-func (w *WorkQueue) SubmitTask(script Script) {
+func (w *WorkQueue) SubmitTask(script config.Script) {
 	log.Debug("Submiting script ", script.Path, " to be executed...")
 	w.Wg.Add(1)
 	w.pendingScriptWorkChan <- script
@@ -50,7 +51,7 @@ func (w *WorkQueue) execWorker(id int) {
 		select {
 		case script := <-w.pendingScriptWorkChan:
 			log.Debugf("[Worker #%d] Running script %s", id, script.Path)
-			scriptResult := RunScript(script, 5)
+			scriptResult := RunScript(script)
 
 			if scriptResult.Error != nil {
 				log.Errorf("[Worker #%d] Encountered error executing script %s (Error: %v)", id, script.Name, scriptResult.Error)

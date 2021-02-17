@@ -1,0 +1,35 @@
+---
+series_prefix: script_exec
+scripts:
+    
+  - name: check_dummy-timeout
+    type: gauge
+    help: Just a dummy check metric, with zero exit code (with sleep of 10s)
+    path: "examples/check_dummy-timeout"
+    output_type: exit_code
+    timeout: 13s
+
+  - name: check_dummy_exit1
+    type: gauge
+    help: Just a dummy check metric, with non-zero exit code
+    path: "examples/check_dummy_exit1"
+    output_type: exit_code
+
+  - name: check_google_ping-timeout
+    type: gauge
+    help: Get the averge ping latency to google.com (25 packets > 5s timeout)
+    path: "examples/check_google_ping-timeout"
+    output_type: stdout
+    timeout: 10s
+    labels:
+      site_category: search_engine
+      url: www.google.com
+
+  - name: check_raw_metrics-timeout
+    path: "examples/check_raw_metrics-timeout"
+    output_type: "raw_series"
+    timeout: 5s
+
+  - name: check_raw_metrics_exit1
+    path: "examples/check_raw_metrics_exit1"
+    output_type: "raw_series"

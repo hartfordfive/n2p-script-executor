@@ -187,7 +187,7 @@ func GenerateSeries(metrics []Metric, execSuccess []string) string {
 	data += fmt.Sprintf("# TYPE %s_build_info counter\n", seriesPrefix)
 	data += fmt.Sprintf("# HELP %s_build_info Build information of the script executor\n", seriesPrefix)
 	data += fmt.Sprintf(
-		"%s_build_info{version=\"%s\", commit_hash=\"%s\", build_date=\"%s\", go_version=\"%s\"} 1",
+		"%s_build_info{version=\"%s\", commit_hash=\"%s\", build_date=\"%s\", go_version=\"%s\"} 1\n",
 		seriesPrefix,
 		version.Version,
 		version.CommitHash,
