@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hartfordfive/n2p-script-executor/config"
 	"github.com/hartfordfive/n2p-script-executor/lib"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,7 +20,7 @@ type ExecutorConfig struct {
 // Run runs the executor
 func Run(cfg ExecutorConfig) {
 
-	cnf, err := LoadConfig(cfg.ConfigFilePath)
+	cnf, err := config.Load(cfg.ConfigFilePath)
 	if err != nil {
 		log.Errorln(err)
 		os.Exit(1)
@@ -30,17 +31,16 @@ func Run(cfg ExecutorConfig) {
 		numWorkers = len(cnf.Scripts)
 	}
 
+	if len(cnf.SeriesPrefix) >= 1 {
+		lib.SetSeriesPrefix(cnf.SeriesPrefix)
+	}
+
 	work := NewWorkQueue(4, numWorkers, len(cnf.Scripts))
 	log.Info("Starting script execution workers...")
 	work.Process()
 
 	log.Info("Submitting scripts to be executed")
-	validOutputTypes := []string{"exit_code", "stdout", "multi_metric", "raw_series"}
 	for _, s := range cnf.Scripts {
-		if !lib.StringIsInSlice(s.OutputType, validOutputTypes) {
-			log.Error("Invalid script output type: ", s.OutputType)
-			continue
-		}
 		work.SubmitTask(s)
 	}
 
@@ -62,6 +62,16 @@ func Run(cfg ExecutorConfig) {
 				Value: 1.0,
 				Type:  "gauge",
 				Help:  "indicates that a script has been identified to be executed",
+			})
+
+			scriptLoadedSeries = append(scriptLoadedSeries, lib.Metric{
+				Name: "script_last_execution_time_ms",
+				Labels: map[string]string{
+					"script": res.ScriptPath,
+				},
+				Value: float64(res.TotalExecTime),
+				Type:  "gauge",
+				Help:  "indicates the number of milliseconds it has taken to execute the script",
 			})
 
 			lastRunSuccess := 0.0
@@ -105,7 +115,11 @@ func Run(cfg ExecutorConfig) {
 
 	seriesOutput := lib.GenerateSeries(series, execSuccess)
 
-	log.Infof("Writing resulting series to %s", cfg.OutputFilePath)
+	if cfg.OutputFilePath != "" {
+		log.Infof("Writing resulting series to %s", cfg.OutputFilePath)
+	} else {
+		log.Info("Writing resulting series to stdout")
+	}
 	if !cfg.Simulate {
 		if len(series) >= 1 {
 			// Write the series to the output file

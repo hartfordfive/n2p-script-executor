@@ -1,0 +1,8 @@
+#!/bin/bash
+sleep 10
+echo "# TYPE my_custom_app_total_requests counter"
+echo "# HELP my_custom_app_total_requests The total number of requests processed per app instance and data shard"
+echo "my_custom_app_total_requests{instance=\"web01\", shard=\"users01\"} 46223"
+echo "my_custom_app_total_requests{instance=\"app01\", shard=\"transactions01\"} 2466"
+echo "my_custom_app_total_requests{instance=\"web03\", shard=\"users02\"} 48665"
+
