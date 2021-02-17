@@ -5,7 +5,9 @@
 * Added ability to customize the current `n2p_script_exec` series prefix to another value.  
 * Updated some logging statements to reduce INFO level messages
 * Fixed issue with execution of `raw_series` and `stdout` type scripts where no timeout was being applied to the script execution.
-** Added a new `script_exec_script_total_execution_time` metric to track the total execution time of each script
+* Added a new `script_exec_script_total_execution_time` metric to track the total execution time of each script
+* Moved configuation struct to a separate `config` package.
+* Added new `InitAndValidate` function to initialize default values for select struct properties as well as validate the value of others.
 
 ## 0.4.0
 * Ensured that `TYPE` and `HELP` metadata lines are only added once for every metric name as being defined multiple times was causing issues for the node_exporter textfile collector module.
