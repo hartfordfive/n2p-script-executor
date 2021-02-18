@@ -1,4 +1,5 @@
-
+## 0.6.0
+* Fixed a bug in script.go - process stuck in an infinite loop because the sample iterator does not ignore badly formatted metrics (it keeps reading them over and over)
 
 ## 0.5.0
 * Added new metric which exposes the build info
