@@ -291,7 +291,10 @@ func RunScript(script config.Script) ExecutionResult {
 	}
 }
 
-// ParsePrometheusSeries is ...
+// ParsePrometheusSeries parses metrics provided in rawSeriesOutput.
+// In case a bad read occurs (because of an illegal metric format or whatever),
+// all metrics read up to this point will be returned. Every metrics present
+// after are ignored.
 func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
 	p := textparse.NewPromParser(rawSeriesOutput)
 
@@ -303,7 +306,16 @@ func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
 
 	for {
 		entry, err := p.Next()
+
+		// All metrics have been read. Exit.
 		if err == io.EOF {
+			break
+		}
+
+		// True if a bad read occurs. The Parsing gets stuck in this case and no other option than quitting is left.
+		if err != nil && entry == textparse.EntryInvalid {
+			series, _, _ := p.Series()
+			log.Errorf("invalid metric %s : %s\n", string(series), err)
 			break
 		}
 
@@ -330,7 +342,6 @@ func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
 		}
 		resLabels = labels.Labels{}
 		labelsMap = make(map[string]string)
-
 	}
 
 	return metrics

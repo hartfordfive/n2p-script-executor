@@ -72,3 +72,7 @@ scripts:
   - name: check_raw_metrics_exit1
     path: "examples/check_raw_metrics_exit1"
     output_type: "raw_series"
+
+  - name: check_not_hanging
+    path: "examples/check_not_hanging"
+    output_type: "raw_series"
