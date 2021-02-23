@@ -14,7 +14,6 @@ import (
 	"github.com/google/renameio"
 	"github.com/hartfordfive/n2p-script-executor/version"
 
-	//"github.com/hartfordfive/n2p-script-executor/executor"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -150,6 +149,14 @@ func ValueCanBeInt(val float64) bool {
 
 func convertToIntString(val float64) string {
 	return strconv.FormatInt(int64(val), 10)
+}
+
+// GenerateSeriesName returns final name of a series, depending on if an override value was specified or not
+func GenerateSeriesName(overrideName, scriptPath string) string {
+	if overrideName != "" {
+		return overrideName
+	}
+	return GetScriptName(scriptPath)
 }
 
 // GenerateSeries takes the array of TextfileCollectorMetric and writes them to the destination file

@@ -1,3 +1,7 @@
+## 0.6.1
+* Added missing logic (via `lib.GenerateSeriesName` function) to use the script overrid metric name value (`script.[X].override_metric_name`) as this configuration parameter was previously accidentally ingnored.
+* Appropriately returning error when `raw_series` type scripts are executed but encounter invalid formated series.
+
 ## 0.6.0
 * Fixed a bug in script.go - process stuck in an infinite loop because the sample iterator does not ignore badly formatted metrics (it keeps reading them over and over)
 

@@ -98,7 +98,7 @@ func RunScript(script config.Script) ExecutionResult {
 					ScriptName: script.Name,
 					Metrics: []lib.Metric{
 						lib.Metric{
-							Name:   lib.GetScriptName(script.Path),
+							Name:   lib.GenerateSeriesName(script.OverrideMetricName, script.Path),
 							Labels: script.Labels,
 							Value:  float64(i),
 							Type:   script.Type,
@@ -124,7 +124,7 @@ func RunScript(script config.Script) ExecutionResult {
 				ScriptName: script.Name,
 				Metrics: []lib.Metric{
 					lib.Metric{
-						Name:   lib.GetScriptName(script.Path),
+						Name:   lib.GenerateSeriesName(script.OverrideMetricName, script.Path),
 						Labels: script.Labels,
 						Value:  float64(waitStatus.ExitStatus()),
 						Type:   script.Type,
@@ -142,7 +142,7 @@ func RunScript(script config.Script) ExecutionResult {
 			ScriptName: script.Name,
 			Metrics: []lib.Metric{
 				lib.Metric{
-					Name:   lib.GetScriptName(script.Path),
+					Name:   lib.GenerateSeriesName(script.OverrideMetricName, script.Path),
 					Labels: script.Labels,
 					Value:  float64(waitStatus.ExitStatus()),
 					Type:   script.Type,
@@ -215,17 +215,25 @@ func RunScript(script config.Script) ExecutionResult {
 	}
 
 	if script.OutputType == "raw_series" {
-		metrics := ParsePrometheusSeries(output)
-		if len(metrics) == 0 {
+		metrics, err := ParsePrometheusSeries(output)
+		if len(metrics) == 0 && err == nil {
 			return ExecutionResult{
-				ScriptPath: script.Path,
-				Error:      fmt.Errorf("No valid series detected in %s", script.Path),
+				ScriptPath:    script.Path,
+				Error:         fmt.Errorf("No valid series detected in %s", script.Path),
+				TotalExecTime: execTotalMs,
+			}
+		} else if err != nil {
+			return ExecutionResult{
+				ScriptPath:    script.Path,
+				Error:         err,
+				TotalExecTime: execTotalMs,
 			}
 		}
 		return ExecutionResult{
-			ScriptPath: script.Path,
-			ScriptName: script.Name,
-			Metrics:    metrics,
+			ScriptPath:    script.Path,
+			ScriptName:    script.Name,
+			Metrics:       metrics,
+			TotalExecTime: execTotalMs,
 		}
 	} else if script.OutputType == "stdout" {
 		f, err := strconv.ParseFloat(res, 64)
@@ -241,7 +249,7 @@ func RunScript(script config.Script) ExecutionResult {
 			ScriptName: script.Name,
 			Metrics: []lib.Metric{
 				lib.Metric{
-					Name:   lib.GetScriptName(script.Path),
+					Name:   lib.GenerateSeriesName(script.OverrideMetricName, script.Path),
 					Labels: script.Labels,
 					Value:  f,
 					Type:   script.Type,
@@ -275,7 +283,7 @@ func RunScript(script config.Script) ExecutionResult {
 			continue
 		}
 		metrics[i] = lib.Metric{
-			Name:   fmt.Sprintf("%s_%s", lib.GetScriptName(script.Path), k),
+			Name:   fmt.Sprintf("%s_%s", lib.GenerateSeriesName(script.OverrideMetricName, script.Path), k),
 			Labels: script.Labels,
 			Value:  f,
 			Type:   script.Type,
@@ -295,7 +303,7 @@ func RunScript(script config.Script) ExecutionResult {
 // In case a bad read occurs (because of an illegal metric format or whatever),
 // all metrics read up to this point will be returned. Every metrics present
 // after are ignored.
-func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
+func ParsePrometheusSeries(rawSeriesOutput []byte) ([]lib.Metric, error) {
 	p := textparse.NewPromParser(rawSeriesOutput)
 
 	var resLabels labels.Labels
@@ -315,8 +323,7 @@ func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
 		// True if a bad read occurs. The Parsing gets stuck in this case and no other option than quitting is left.
 		if err != nil && entry == textparse.EntryInvalid {
 			series, _, _ := p.Series()
-			log.Errorf("invalid metric %s : %s\n", string(series), err)
-			break
+			return []lib.Metric{}, fmt.Errorf("raw_series output encountered an invalid series: %s", string(series))
 		}
 
 		switch entry {
@@ -344,5 +351,5 @@ func ParsePrometheusSeries(rawSeriesOutput []byte) []lib.Metric {
 		labelsMap = make(map[string]string)
 	}
 
-	return metrics
+	return metrics, nil
 }

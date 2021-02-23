@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/go-yaml/yaml"
@@ -77,6 +78,16 @@ func (c *Config) InitAndValidate() error {
 		if !lib.StringIsInSlice(c.Scripts[i].OutputType, validOutputTypes) {
 			return (fmt.Errorf("Invalid script output type: %s", c.Scripts[i].OutputType))
 		}
+
+		if c.Scripts[i].OverrideMetricName != "" {
+			if len(c.Scripts[i].OverrideMetricName) < 2 {
+				return fmt.Errorf("override metric name for %s must be at least 2 characters long", c.Scripts[i].Name)
+			}
+			if match, _ := regexp.MatchString("[a-zA-Z_:][a-zA-Z0-9_:]*", c.Scripts[i].OverrideMetricName); !match {
+				return fmt.Errorf("override metric name '%s' for %s is invalid", c.Scripts[i].OverrideMetricName, c.Scripts[i].Name)
+			}
+		}
+
 	}
 
 	return nil
