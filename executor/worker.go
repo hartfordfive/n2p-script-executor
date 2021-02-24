@@ -54,7 +54,7 @@ func (w *WorkQueue) execWorker(id int) {
 			scriptResult := RunScript(script)
 
 			if scriptResult.Error != nil {
-				log.Errorf("[Worker #%d] Encountered error executing script %s (Error: %v)", id, script.Name, scriptResult.Error)
+				log.Errorf("[Worker #%d] Encountered error executing script %s : %v", id, script.Name, scriptResult.Error)
 			} else {
 				log.Debugf("[Worker #%d] Script %s completed execution. Result: %v", id, script.Name, scriptResult)
 			}
